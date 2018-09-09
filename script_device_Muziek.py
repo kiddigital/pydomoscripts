@@ -7,6 +7,7 @@ LEVEL1 = 'Achtergrond'
 LEVEL2 = 'Zachtjes'
 LEVEL3 = 'Luisteren'
 STREAMER = '9'
+COAXIN = '5'
 
 def talk_to_nad(cmd=None):
     if cmd is None:
@@ -20,8 +21,21 @@ def talk_to_nad(cmd=None):
     except:
         return False
 
-    ret = out.stdout.rstrip('\r\n').split('=',maxsplit=1)
-    return ret[1]
+    ret = out.stdout.rstrip('\r\n')
+    ret = ret.split('=',maxsplit=1)
+    if len(ret) == 2:
+        return ret[1]
+    return ret[0]
+
+def set_volume(vol=-72):
+    iNewVolume = int(vol)
+    if iNewVolume <= -20 and iNewVolume >= -72:
+        sCurVolume = talk_to_nad('Main.Volume='+str(iNewVolume))
+        if int(sCurVolume) != iNewVolume:
+            return False
+    else:
+        return False
+    return int(sCurVolume)
 
 if DE.changed_device_name == "Muziek":
 
@@ -29,8 +43,8 @@ if DE.changed_device_name == "Muziek":
     bContinue = True
     sValue = None
     sCurPower = None
-    sCurVolume = None
     sCurSource = None
+    sCurVolume = None
 
     sValue=DE.Devices["Muziek"].n_value_string
     sCurPower=talk_to_nad('Main.Power?')
@@ -40,7 +54,7 @@ if DE.changed_device_name == "Muziek":
     sNewVolume = sCurVolume
     sNewSource = sCurSource
 
-    if (sPower == False or sVolume == False or sSource == False):
+    if (sCurPower == False or sCurVolume == False or sCurSource == False):
         DE.Log(sHead + "Failed to communicate succesfully with NAD! ")
         bContinue = False
     else:
@@ -48,6 +62,7 @@ if DE.changed_device_name == "Muziek":
             #DE.Log('Turning Off')
             sNewPower = 'Off'
             sNewVolume = '-72'
+            sNewSource = COAXIN
         elif sValue == LEVEL1:
             #DE.Log('Achtergrond On')
             sNewPower = 'On'
@@ -66,21 +81,27 @@ if DE.changed_device_name == "Muziek":
         else:
             DE.Log(sHead + 'Unknown level ' + sValue)
 
-    if sNewVolume != sCurVolume:
-        sCurVolume = talk_to_nad('Main.Volume='+sNewVolume)
-        if sCurVolume != sNewVolume:
-            DE.Log(sHead + 'Setting Volume failed!')
-            bContinue = False
-
-    if sNewSource != sCurSource:
-        sCurSource = talk_to_nad('Main.Volume='+sNewSource)
-        if sCurSource != sNewSource:
-            DE.Log(sHead + 'Setting Source failed!')
-            bContinue = False
+    if sNewVolume != sCurVolume and bContinue:
+       iNewVolume = set_volume(sNewVolume)
+       if iNewVolume == False:
+           DE.Log(sHead + 'Setting Volume failed!')
+           bContinue = False
+       else:
+           sNewVolume=str(iNewVolume)
 
     if sNewPower != sCurPower and bContinue:
         sCurPower = talk_to_nad('Main.Power='+sNewPower)
         if sCurPower != sNewPower:
             DE.Log(sHead + 'Turning Power on/off failed!')
+            bContinue = False
+        else:
+            if sCurPower == 'On':
+                sCurSource = talk_to_nad('Main.Source='+COAXIN)
+
+    if sNewSource != sCurSource and bContinue:
+        sCurSource = talk_to_nad('Main.Source='+sNewSource)
+        if sCurSource != sNewSource:
+            DE.Log(sHead + 'Setting Source failed!')
+            bContinue = False
 
     DE.Log(sHead + 'NAD set to ' + sCurPower + ', Volume: ' + sCurVolume + ', Source: ' + sCurSource)
